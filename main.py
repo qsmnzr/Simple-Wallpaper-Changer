@@ -10,13 +10,18 @@ import subprocess
 from PIL import Image
 from datetime import datetime
 
+# ---------- RESOURCE PATH (برای PyInstaller) ----------
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 # ---------- SINGLE INSTANCE CHECK ----------
 def is_already_running():
-    # یک نام منحصر به فرد برای Mutex انتخاب می‌کنیم
     mutex_name = "SimpleWallpaperChanger_Unique_ID_12345"
-    # ایجاد Mutex در ویندوز
     mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
-    # کد خطای 183 نشان‌دهنده این است که Mutex قبلاً ساخته شده (یعنی برنامه باز است)
     if ctypes.windll.kernel32.GetLastError() == 183:
         return True
     return False
@@ -30,7 +35,7 @@ else:
     APP_PATH = sys.executable + " " + os.path.abspath(__file__)
 
 WALLPAPER_DIR = os.path.join(BASE_DIR, "Wallpapers")
-ICON_PATH = os.path.join(BASE_DIR, "icon.png")
+ICON_PATH = resource_path("icon.png")
 
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.ini")
 HISTORY_FILE = os.path.join(BASE_DIR, "history.ini")
@@ -379,7 +384,6 @@ def create_menu():
 # ---------- MAIN ----------
 if __name__=="__main__":
     
-    # بررسی برای جلوگیری از اجرای چندباره
     if is_already_running():
         sys.exit(0)
 
