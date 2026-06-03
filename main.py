@@ -6,6 +6,7 @@ import winreg
 import pystray
 import threading
 import configparser
+import subprocess
 from PIL import Image
 from datetime import datetime
 
@@ -37,7 +38,9 @@ auto_change_enabled = False
 interval_seconds = 60
 last_change = None
 
-tray_icon = None  # برای دسترسی به آیکون جهت آپدیت Tooltip
+tray_icon = None  
+total_count = 0    
+current_index = 0  
 
 def load_settings():
     global auto_change_enabled, interval_seconds, last_change
@@ -94,13 +97,25 @@ def toggle_startup(icon, item):
         enable_startup()
     icon.update_menu()
 
+# ---------- UTILS ----------
+def open_current_wallpaper_in_explorer(icon, item):
+    """باز کردن اکسپلورر روی فایل فعلی با انتخاب دقیق آن"""
+    history = load_history()
+    if history:
+        current_path = history[-1]
+        if os.path.exists(current_path):
+            # تبدیل مسیر به فرمت استاندارد ویندوز و باز کردن فایل
+            normalized_path = os.path.normpath(current_path)
+            cmd = f'explorer.exe /select, "{normalized_path}"'
+            subprocess.Popen(cmd)
+
 # ---------- ABOUT ----------
 def show_about(icon=None, item=None):
     def _display_message():
         text = (
             "Simple Wallpaper Changer\n"
             "A lightweight system tray wallpaper changer.\n\n"
-            "Version: 1.1\n"
+            "Version: 1.3\n"
             "Date: 2026/06/03\n\n"
             "Author: Ghasem Nazari\n"
             "Email: Ghasem.Nazari@gmail.com\n"
@@ -142,18 +157,17 @@ def load_history():
         return [x.strip() for x in f if x.strip()]
 
 def get_tooltip_text(path):
-    """ساخت متن تولتیپ شامل اسم فایل و پوشه والد"""
+    global current_index, total_count
     if not path or not os.path.exists(path):
         return "Simple Wallpaper Changer"
     
     file_name = os.path.basename(path)
     parent_dir = os.path.basename(os.path.dirname(path))
     
-    # فرمت: Folder / FileName
-    return f"Simple Wallpaper Changer\n{parent_dir} / {file_name}"
+    return f"Simple Wallpaper Changer\n{parent_dir} / {file_name}\n{current_index} / {total_count}"
 
-def apply_wallpaper(path):
-    global last_change, tray_icon
+def apply_wallpaper(path, is_undo=False):
+    global last_change, tray_icon, current_index
 
     key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop", 0, winreg.KEY_SET_VALUE)
     winreg.SetValueEx(key, "WallpaperStyle", 0, winreg.REG_SZ, "10")
@@ -162,37 +176,47 @@ def apply_wallpaper(path):
 
     ctypes.windll.user32.SystemParametersInfoW(20, 0, path, 3)
 
-    with open(HISTORY_FILE, "a", encoding="utf-8") as f:
-        f.write(path + "\n")
-
+    if not is_undo:
+        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            f.write(path + "\n")
+        current_index += 1
+    
     last_change = datetime.now()
     save_settings()
 
-    # آپدیت متن تولتیپ آیکون
     if tray_icon:
         tray_icon.title = get_tooltip_text(path)
 
 def set_random_wallpaper(icon=None, item=None):
+    global current_index
     images = get_all_wallpapers()
     if not images:
         return
     history = load_history()
     available = [i for i in images if i not in history]
+    
     if not available:
         open(HISTORY_FILE, "w").close()
+        current_index = 0
         available = images
+    
     apply_wallpaper(random.choice(available))
 
 def set_previous_wallpaper(icon=None, item=None):
+    global current_index
     history = load_history()
     if len(history) < 2:
         return
+    
     prev = history[-2]
-    new_history = history[:-2]
+    new_history = history[:-2] 
+    
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         if new_history:
             f.write("\n".join(new_history) + "\n")
-    apply_wallpaper(prev)
+    
+    current_index -= 1 
+    apply_wallpaper(prev, is_undo=True)
 
 # ---------- AUTO WORKER ----------
 stop_event = threading.Event()
@@ -246,6 +270,8 @@ def create_menu():
     return pystray.Menu(
         pystray.MenuItem("Next Wallpaper", set_random_wallpaper, default=True),
         pystray.MenuItem("Previous Wallpaper", set_previous_wallpaper),
+        pystray.MenuItem("Open in Explorer", open_current_wallpaper_in_explorer),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem(lambda item: f"Auto Change ({get_interval_text()})", toggle_auto, checked=lambda item: auto_change_enabled),
         pystray.MenuItem("Start with Windows", toggle_startup, checked=lambda item: is_startup_enabled()),
         pystray.MenuItem("Every", pystray.Menu(
@@ -263,15 +289,18 @@ if __name__ == "__main__":
     ensure_sample_wallpapers()
     load_settings()
 
+    all_images = get_all_wallpapers()
+    total_count = len(all_images)
+    
+    history = load_history()
+    current_index = len(history)
+    initial_path = history[-1] if history else None
+
     if os.path.exists(ICON_PATH):
         image = Image.open(ICON_PATH)
     else:
         image = Image.new("RGB", (64, 64), (70, 120, 200))
 
-    # پیدا کردن آخرین والپیپر برای نمایش در اولین اجرا
-    history = load_history()
-    initial_path = history[-1] if history else None
-    
     icon = pystray.Icon(
         "WallpaperChanger",
         image,
@@ -279,7 +308,7 @@ if __name__ == "__main__":
         create_menu()
     )
     
-    tray_icon = icon # ذخیره در متغیر سراسری
+    tray_icon = icon
 
     if not history:
         set_random_wallpaper()
