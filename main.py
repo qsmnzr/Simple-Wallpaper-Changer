@@ -1,0 +1,440 @@
+import os
+import sys
+import random
+import ctypes
+import winreg
+import pystray
+import threading
+import configparser
+from PIL import Image
+from datetime import datetime
+
+# ---------- PATHS ----------
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(sys.executable)
+    APP_PATH = sys.executable
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    APP_PATH = sys.executable + " " + os.path.abspath(__file__)
+
+WALLPAPER_DIR = os.path.join(BASE_DIR, "Wallpapers")
+ICON_PATH = os.path.join(BASE_DIR, "icon.png")
+
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.ini")
+HISTORY_FILE = os.path.join(BASE_DIR, "history.ini")
+
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+APP_NAME = "SimpleWallpaperChanger"
+
+EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp")
+
+numbers = [1,2,3,4,5,10,15,20,30]
+
+# ---------- SETTINGS ----------
+config = configparser.ConfigParser()
+
+auto_change_enabled = False
+interval_seconds = 60
+last_change = None
+
+
+def load_settings():
+
+    global auto_change_enabled, interval_seconds, last_change
+
+    if os.path.exists(SETTINGS_FILE):
+        config.read(SETTINGS_FILE)
+
+    auto_change_enabled = config.getboolean("GENERAL","auto",fallback=False)
+    interval_seconds = config.getint("GENERAL","interval",fallback=60)
+
+    t = config.get("GENERAL","last_change",fallback=None)
+
+    if t:
+        try:
+            last_change = datetime.fromisoformat(t)
+        except:
+            last_change = None
+
+
+def save_settings():
+
+    config["GENERAL"] = {
+        "auto": str(auto_change_enabled),
+        "interval": str(interval_seconds),
+        "last_change": last_change.isoformat() if last_change else ""
+    }
+
+    with open(SETTINGS_FILE,"w") as f:
+        config.write(f)
+
+
+# ---------- STARTUP ----------
+def is_startup_enabled():
+
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY)
+        winreg.QueryValueEx(key, APP_NAME)
+        winreg.CloseKey(key)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def enable_startup():
+
+    key = winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER,
+        RUN_KEY,
+        0,
+        winreg.KEY_SET_VALUE
+    )
+
+    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, APP_PATH)
+    winreg.CloseKey(key)
+
+
+def disable_startup():
+
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            RUN_KEY,
+            0,
+            winreg.KEY_SET_VALUE
+        )
+
+        winreg.DeleteValue(key, APP_NAME)
+        winreg.CloseKey(key)
+
+    except FileNotFoundError:
+        pass
+
+
+def toggle_startup(icon,item):
+
+    if is_startup_enabled():
+        disable_startup()
+    else:
+        enable_startup()
+
+    icon.update_menu()
+
+
+# ---------- ABOUT ----------
+def show_about(icon=None, item=None):
+    
+    def _display_message():
+        text = (
+            "Simple Wallpaper Changer\n"
+            "A lightweight system tray wallpaper changer.\n"
+            "\n"
+            "Version: 1.0\n"
+            "Date: 2026/06/03\n"
+            "\n"
+            "Author: Ghasem Nazari\n"
+            "Email: Ghasem.Nazari@gmail.com\n"
+            "Github: qsmnzr\n"
+        )
+        ctypes.windll.user32.MessageBoxW(0, text, "About", 0x40)
+
+    threading.Thread(target=_display_message, daemon=True).start()
+
+
+# ---------- SAMPLE WALLPAPERS ----------
+
+def ensure_sample_wallpapers():
+
+    solids = os.path.join(WALLPAPER_DIR,"Solids")
+
+    if os.path.exists(solids):
+        return
+
+    os.makedirs(solids,exist_ok=True)
+
+    colors = {
+        "White":(255,255,255),
+        "Blue":(0,0,255),
+        "Green":(0,128,0),
+        "Yellow":(255,255,0),
+        "Red":(255,0,0),
+        "Black":(0,0,0),
+        "Brown": (101, 67, 33)
+    }
+
+    for name,rgb in colors.items():
+
+        img = Image.new("RGB",(3840,2160),rgb)
+
+        img.save(os.path.join(solids,f"{name}.png"),"PNG")
+
+
+# ---------- WALLPAPER ----------
+
+def get_all_wallpapers():
+
+    images = []
+
+    if not os.path.exists(WALLPAPER_DIR):
+        return images
+
+    for root,_,files in os.walk(WALLPAPER_DIR):
+
+        for f in files:
+
+            if f.lower().endswith(EXTENSIONS):
+
+                images.append(os.path.abspath(os.path.join(root,f)))
+
+    return images
+
+
+def load_history():
+
+    if not os.path.exists(HISTORY_FILE):
+        return []
+
+    with open(HISTORY_FILE,"r",encoding="utf-8") as f:
+
+        return [x.strip() for x in f if x.strip()]
+
+
+def apply_wallpaper(path):
+
+    global last_change
+
+    key = winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER,
+        r"Control Panel\Desktop",
+        0,
+        winreg.KEY_SET_VALUE
+    )
+
+    winreg.SetValueEx(key,"WallpaperStyle",0,winreg.REG_SZ,"10")
+    winreg.SetValueEx(key,"TileWallpaper",0,winreg.REG_SZ,"0")
+
+    winreg.CloseKey(key)
+
+    ctypes.windll.user32.SystemParametersInfoW(20,0,path,3)
+
+    with open(HISTORY_FILE,"a",encoding="utf-8") as f:
+        f.write(path+"\n")
+
+    last_change = datetime.now()
+
+    save_settings()
+
+
+def set_random_wallpaper(icon=None,item=None):
+
+    images = get_all_wallpapers()
+
+    if not images:
+        return
+
+    history = load_history()
+
+    available = [i for i in images if i not in history]
+
+    if not available:
+
+        open(HISTORY_FILE,"w").close()
+
+        available = images
+
+    apply_wallpaper(random.choice(available))
+
+
+def set_previous_wallpaper(icon=None,item=None):
+
+    history = load_history()
+
+    if len(history) < 2:
+        return
+
+    prev = history[-2]
+
+    new_history = history[:-2]
+
+    with open(HISTORY_FILE,"w",encoding="utf-8") as f:
+
+        if new_history:
+            f.write("\n".join(new_history)+"\n")
+
+    apply_wallpaper(prev)
+
+
+# ---------- AUTO WORKER ----------
+stop_event = threading.Event()
+
+
+def auto_worker():
+
+    while not stop_event.is_set():
+
+        if not auto_change_enabled:
+
+            stop_event.wait(1)
+            continue
+
+        now = datetime.now()
+
+        step = interval_seconds
+
+        epoch = int(now.timestamp())
+
+        next_boundary = epoch - (epoch % step) + step
+
+        wait_time = next_boundary - epoch
+
+        if wait_time > 0:
+            stop_event.wait(wait_time)
+
+        if auto_change_enabled:
+            set_random_wallpaper()
+
+
+# ---------- MENU ----------
+def toggle_auto(icon,item):
+
+    global auto_change_enabled
+
+    auto_change_enabled = not auto_change_enabled
+
+    save_settings()
+
+    icon.update_menu()
+
+
+def set_interval(value):
+
+    global interval_seconds
+
+    interval_seconds = value
+
+    save_settings()
+
+
+def get_interval_text():
+
+    s = interval_seconds
+
+    if s % 86400 == 0:
+        return f"{s//86400} Day"
+
+    if s % 3600 == 0:
+        return f"{s//3600} Hour"
+
+    if s % 60 == 0:
+        return f"{s//60} Minute"
+
+    return f"{s} Sec"
+
+
+def create_number_menu(mult):
+
+    items=[]
+
+    for n in numbers:
+
+        value=n*mult
+
+        def make_action(v):
+            def action(icon,item):
+                set_interval(v)
+            return action
+
+        def make_checked(v):
+            def checked(item):
+                return interval_seconds==v
+            return checked
+
+        items.append(
+            pystray.MenuItem(
+                str(n),
+                make_action(value),
+                checked=make_checked(value)
+            )
+        )
+
+    return pystray.Menu(*items)
+
+
+def create_menu():
+
+    return pystray.Menu(
+
+        pystray.MenuItem(
+            "Next Wallpaper",
+            set_random_wallpaper,
+            default=True
+        ),
+
+        pystray.MenuItem(
+            "Previous Wallpaper",
+            set_previous_wallpaper
+        ),
+
+        pystray.MenuItem(
+            lambda item: f"Auto Change ({get_interval_text()})",
+            toggle_auto,
+            checked=lambda item: auto_change_enabled
+        ),
+
+        pystray.MenuItem(
+            "Start with Windows",
+            toggle_startup,
+            checked=lambda item: is_startup_enabled()
+        ),
+
+        pystray.MenuItem(
+            "Every",
+            pystray.Menu(
+                pystray.MenuItem("Minute",create_number_menu(60)),
+                pystray.MenuItem("Hour",create_number_menu(3600)),
+                pystray.MenuItem("Day",create_number_menu(86400)),
+            )
+        ),
+
+        pystray.Menu.SEPARATOR,
+
+        pystray.MenuItem(
+            "About",
+            show_about
+        ),
+
+        pystray.MenuItem(
+            "Exit",
+            lambda icon,item: icon.stop()
+        )
+    )
+
+
+# ---------- MAIN ----------
+if __name__=="__main__":
+
+    ensure_sample_wallpapers()
+
+    load_settings()
+
+    if os.path.exists(ICON_PATH):
+        image=Image.open(ICON_PATH)
+    else:
+        image=Image.new("RGB",(64,64),(70,120,200))
+
+    icon=pystray.Icon(
+        "WallpaperChanger",
+        image,
+        "Wallpaper Changer",
+        create_menu()
+    )
+
+    if not load_history():
+        set_random_wallpaper()
+
+    threading.Thread(
+        target=auto_worker,
+        daemon=True
+    ).start()
+
+    icon.run()
