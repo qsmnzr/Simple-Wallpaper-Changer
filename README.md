@@ -19,10 +19,8 @@
 ## 📁 Folder Structure
 
 The application organizes wallpapers into categorized subdirectories:
-- `simpledesktops.com/` - Wallpapers from SimpleDesktops website
 - `Solids/` - Solid color backgrounds (with sample colors)
-- `wallhaven.cc/` - Wallpapers from Wallhaven platform  
-- `XXX/` - Adult content category
+- you can copy and paste your folders containing more wallpapers beside it
 
 ## ⚙️ Technical Details
 
@@ -48,10 +46,8 @@ The application organizes wallpapers into categorized subdirectories:
 
 ## 🔧 Installation & Usage
 
-1. Ensure Python is installed on your system
-2. Install dependencies: `pip install -r requirements.txt`
-3. Run the application using: `python main.py` or execute the compiled binary
-4. Access via system tray icon for all controls
+1. execute the compiled binary
+2. Access via system tray icon for all controls
 
 ## 📝 Notes
 

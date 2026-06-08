@@ -1,0 +1,3 @@
+Pillow>=8.0.0
+pystray>=0.17.0
+PyWin32>=227
