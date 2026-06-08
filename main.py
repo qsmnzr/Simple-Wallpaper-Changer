@@ -182,17 +182,30 @@ def ensure_sample_wallpapers():
 
     os.makedirs(solids, exist_ok=True)
 
-    colors = {
-        "White": (255,255,255),
-        "Blue": (0,0,255),
-        "Green": (0,128,0),
-        "Yellow": (255,255,0),
-        "Red": (255,0,0),
-        "Black": (0,0,0),
-        "Brown": (101,67,33)
-    }
+    import colorsys
 
-    for name,rgb in colors.items():
+    def generate_wallpapers(count):
+        if count < 1:
+            return []
+        if count == 1:                      # Handle single color case
+            return [(0, 0, 0)]
+        colors = []
+        colors.append((255, 255, 255))      # First color = Pure white
+        middle_count = count - 2            # Calculate the number of intermediate colors
+        for i in range(middle_count):
+            h = i / middle_count            # Hue: Cycle through the color spectrum
+            s = 0.6 + 0.4 * (i % 2)         # Saturation: Alternate between vivid and soft/muted colors
+            l = 0.4 + 0.4 * ((i % 3) / 2)   # Lightness: Alternate between dark and bright shades
+            r, g, b = colorsys.hls_to_rgb(h, l, s)
+            colors.append((int(r * 255), int(g * 255), int(b * 255)))
+        colors.append((0, 0, 0))            # Last color = Pure black
+        return colors
+
+    solids_counts = 30
+    generated_colors = generate_wallpapers(solids_counts)
+
+    for i, rgb in enumerate(generated_colors):
+        name = f"Solid_{i+1:02d}"
         img = Image.new("RGB",(3840,2160),rgb)
         img.save(os.path.join(solids,f"{name}.png"))
 

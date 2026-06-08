@@ -22,6 +22,7 @@ The application organizes wallpapers into categorized subdirectories:
 - `Solids/` - Solid color backgrounds (with sample colors)
 - you can copy and paste your folders containing more wallpapers beside it
 
+
 ## ⚙️ Technical Details
 
 - Built with Python using pystray for system tray integration
@@ -46,8 +47,10 @@ The application organizes wallpapers into categorized subdirectories:
 
 ## 🔧 Installation & Usage
 
-1. execute the compiled binary
-2. Access via system tray icon for all controls
+1. Ensure Python is installed on your system
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run the application using: `python main.py` or execute the compiled binary
+4. Access via system tray icon for all controls
 
 ## 📝 Notes
 
