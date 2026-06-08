@@ -47,9 +47,7 @@ The application organizes wallpapers into categorized subdirectories:
 
 ## 🔧 Installation & Usage
 
-1. Ensure Python is installed on your system
-2. Install dependencies: `pip install -r requirements.txt`
-3. Run the application using: `python main.py` or execute the compiled binary
+1. Download and execute the compiled binary(dist folder)
 4. Access via system tray icon for all controls
 
 ## 📝 Notes
