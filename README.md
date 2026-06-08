@@ -40,7 +40,7 @@ The application organizes wallpapers into categorized subdirectories:
 - **Reliable**: Stable operation with proper error handling
 - **Private**: All wallpapers stored locally, no internet connection required
 
-## 🖼️ Screenshots (Coming Soon)
+## 🖼️ Screenshots
 
 <div align="center">
   <img src="screenshot.png" width="400" alt="icon">
