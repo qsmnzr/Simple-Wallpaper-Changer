@@ -42,7 +42,9 @@ The application organizes wallpapers into categorized subdirectories:
 
 ## 🖼️ Screenshots (Coming Soon)
 
-*Add screenshots of the application's interface and functionality here*
+<div align="center">
+  <img src="screenshot.png" width="400" alt="icon">
+</div>
 
 ## 🔧 Installation & Usage
 
